@@ -2,3 +2,5 @@
 /cribelo.exe
 /out/
 /dist/
+go.work
+go.work.sum

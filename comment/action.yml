@@ -1,5 +1,5 @@
 name: Cribelo comment
-description: Posts the plan of a cribelo run on a pull request from a fork, from a workflow_run workflow.
+description: Posts the plan of a cribelo run, and its review comments when it made some, on a pull request from a fork, from a workflow_run workflow.
 author: Jean-François Lépine
 branding:
   icon: filter
@@ -54,6 +54,11 @@ runs:
             exit 1
           fi
         done
+        review="$dir/files/review.json"
+        if [ -L "$review" ] || { [ -e "$review" ] && [ ! -f "$review" ]; }; then
+          echo "::error::cribelo: review.json in the artifact is not a regular file"
+          exit 1
+        fi
 
         pr=$(head -c 32 "$dir/files/pr" | tr -d '[:space:]')
         if ! [[ "$pr" =~ ^[0-9]{1,10}$ ]]; then
@@ -68,3 +73,9 @@ runs:
         fi
 
         "$GITHUB_ACTION_PATH/../scripts/post-comment.sh" "$REPO" "$pr" "$dir/files/plan.md"
+        # The review is built by the fork's run: only its paths, line numbers
+        # and short texts reach the API, and the texts are the fork's to write
+        # in the pull request anyway.
+        if [ -f "$review" ] && ! "$GITHUB_ACTION_PATH/../scripts/post-review.sh" "$REPO" "$pr" "$review"; then
+          echo "::warning::cribelo: the plan is posted, the review comments on the lines are not"
+        fi

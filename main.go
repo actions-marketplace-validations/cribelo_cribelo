@@ -1,7 +1,8 @@
 // Command cribelo tells which files of a change are worth a human reader.
 //
-// The analysis lives in github.com/ast-metrics/ast-metrics; this module pins
-// a revision of it in go.mod and builds the released binary.
+// The analysis lives in github.com/ast-metrics/ast-metrics, whose cribelo
+// package this module pins in go.mod. The command line and the layout of the
+// reports are here, in internal/cli and internal/render.
 package main
 
 import (
@@ -9,7 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/ast-metrics/ast-metrics/cribelo"
+	"github.com/cribelo/cribelo/internal/cli"
 )
 
 // version is set at release time with -ldflags "-X main.version=1.2.3". A
@@ -17,12 +18,13 @@ import (
 var version = ""
 
 func main() {
-	os.Exit(cribelo.Run(os.Args, fullVersion()))
+	os.Exit(cli.Run(os.Args, fullVersion()))
 }
 
 // fullVersion is "1.2.3 (engine a1b2c3d)": the release of Cribelo, then the
 // revision of AST Metrics it was built with, a tag or the commit of a
-// pseudo-version.
+// pseudo-version. A build from a go.work that points at a local checkout of
+// the engine has no revision to name and says so.
 func fullVersion() string {
 	v := version
 	info, ok := debug.ReadBuildInfo()
@@ -43,6 +45,9 @@ func fullVersion() string {
 			continue
 		}
 		engine := dep.Version
+		if engine == "(devel)" {
+			return v + " (engine local)"
+		}
 		if i := strings.LastIndex(engine, "-"); i >= 0 && strings.Count(engine, "-") >= 2 {
 			engine = engine[i+1:] // pseudo-version: keep the commit
 		}

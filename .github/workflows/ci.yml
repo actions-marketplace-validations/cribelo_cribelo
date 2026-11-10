@@ -11,5 +11,7 @@ jobs:
         with: { go-version-file: go.mod }
       - run: sudo apt-get update && sudo apt-get install -y build-essential
       - run: go vet ./...
+      - run: go test ./...
+        env: { CGO_ENABLED: 1 }
       - run: go build -o cribelo . && ./cribelo --version
         env: { CGO_ENABLED: 1 }

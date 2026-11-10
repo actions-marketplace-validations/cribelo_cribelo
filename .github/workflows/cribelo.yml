@@ -12,3 +12,6 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: ./
+        with:
+          version: source
+          inline: true

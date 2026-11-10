@@ -125,6 +125,16 @@ The plan is posted as a single comment and updated on each push. Each line range
 
 `fail-over: 1h` fails the job when reading the whole change, every file with something to read, would take more than an hour: the change is too large for one reviewer, split it. `fail-on` fails it when the change states a fact of the kinds you name, here an import cycle introduced or an exported signature changed that other files call; any kind listed under the facts below works. The gate is set on what the plan measures, never on the score. The job log and the comment say why it failed, one line per breach, such as "reading time 1 h 17, over the 1 h allowed".
 
+The lines to read closely can also be marked on the diff itself:
+
+```yaml
+      - uses: cribelo/cribelo@v2
+        with:
+          inline: true
+```
+
+Each span then carries a review comment at its place in the Files tab, naming the functions it falls in and how their complexity moved, with the facts about the file on the first one. The comments of the previous run are removed when a new push is reviewed, so the diff only shows the current ones. Outside GitHub Actions, `cribelo --format github-review` prints the body of the review for the [reviews endpoint](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request), and `scripts/post-review.sh` posts it with `gh`.
+
 ### Pull requests from forks
 
 GitHub runs a pull request from a fork, or from Dependabot, with a read-only token, so the job cannot comment. The plan still lands in the job summary, and in an artifact that a second workflow posts with the rights of your repository. Save it as `.github/workflows/cribelo-comment.yml`:
@@ -248,4 +258,11 @@ Fix commits are recognized by `fix:` and `revert:` conventional types, the 🐛 
 
 ## Source
 
-Cribelo is a command of [AST Metrics](https://github.com/ast-metrics/ast-metrics): the parsers, the complexity model and the dependency graph come from there, and the code of Cribelo lives in its `cribelo` and `internal/cribelo` directories. This repository pins a revision of it in `go.mod` and builds the binary from it, and holds the Action, the installer, the documentation and the issues. MIT license.
+The analysis is the `cribelo` package of [AST Metrics](https://github.com/ast-metrics/ast-metrics): the parsers, the complexity model, the dependency graph, the facts and the reading order come from there, and this repository pins a revision of it in `go.mod`. What you read is composed here: the command line in `internal/cli`, the terminal plan, the pull request comment and the description in `internal/render`. A change of wording or layout is a pull request on this repository; a change of what is measured is one on AST Metrics. This repository also holds the Action, the installer, the documentation and the issues. MIT license.
+
+To work on the output against a local checkout of the engine, point a `go.work` at it (the file is ignored by git):
+
+```sh
+go work init . ../ast-metrics
+go test ./... && go run . -C ../some-repository
+```
