@@ -475,6 +475,10 @@ func (p Report) textReading(b *strings.Builder) {
 	}
 }
 
+// unfoldedWhy is the number of files up to which "Why these files" is shown
+// unfolded in the pull request comment.
+const unfoldedWhy = 3
+
 // markdownReading writes the three blocks for a pull request comment: the
 // table of where to read, and, folded, why these files and how much.
 func (p Report) markdownReading(b *strings.Builder) {
@@ -498,7 +502,13 @@ func (p Report) markdownReading(b *strings.Builder) {
 			paths[i] = r.file.Path
 		}
 		names := shortNames(paths)
-		b.WriteString("\n<details><summary><b>Why these files</b></summary>\n\n| | File |")
+		// A short list is read with its signals in sight: the table is
+		// folded only when it would push the rest down.
+		open := ""
+		if len(signals) <= unfoldedWhy {
+			open = " open"
+		}
+		b.WriteString("\n<details" + open + "><summary><b>Why these files</b></summary>\n\n| | File |")
 		for _, c := range cols {
 			header := strings.ToUpper(c.header[:1]) + c.header[1:]
 			if c.header != "test changed" {
