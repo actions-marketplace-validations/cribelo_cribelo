@@ -58,7 +58,7 @@ func TestPlanMarkdown(t *testing.T) {
 	md := samplePlan().Markdown()
 	assert.Contains(t, md, "## Cribelo: read 1 of 3 changed files, about 2 min\n")
 	assert.Contains(t, md, "| | File | Lines to read&nbsp;closely | Lines to glance&nbsp;at |\n|--:|:--|:--|:--|\n| 1 | `a.go` |  |  |\n")
-	assert.Contains(t, md, "<details><summary><b>Why these files</b></summary>\n\n| | File | Complexity | Used&nbsp;by | Commits&nbsp;90d | Test changed |\n|--:|:--|:--|:--|:--|:-:|\n")
+	assert.Contains(t, md, "<details open><summary><b>Why these files</b></summary>\n\n| | File | Complexity | Used&nbsp;by | Commits&nbsp;90d | Test changed |\n|--:|:--|:--|:--|:--|:-:|\n")
 	assert.Contains(t, md, "| 1 | `a.go`<br><sub>90% similar to `b.go:H()`</sub> | 🟩&#8288;⬜&#8288;⬜&#8288;⬜&#8288;⬜&nbsp;5 | 🟨&#8288;🟨&#8288;⬜&#8288;⬜&#8288;⬜&nbsp;4 | 🟧&#8288;🟧&#8288;🟧&#8288;⬜&#8288;⬜&nbsp;7, 2&nbsp;fixes | ❌ |\n")
 	assert.Contains(t, md, "<sub><b>Complexity</b>: highest cyclomatic complexity among the functions touched.")
 	assert.Contains(t, md, "<details><summary><b>Totals</b>: 12 lines to read closely, 0 to glance at</summary>\n\n| | File | Lines to read closely | Lines to glance at |\n|--:|:--|--:|--:|\n| 1 | `a.go` | 12 | 0 |\n\n<sub><b>Read closely</b>: code lines in functions that gained a branch, or whose complexity is above 3.")
@@ -176,7 +176,7 @@ func TestReadingMarkdown(t *testing.T) {
 		"| 2 | `core/store_test.go` *test* | line&nbsp;8 | 20-&#8288;49 |\n"+
 		"| 3 | `api/handler.go` |  | line&nbsp;12 |\n"+
 		"| 4 | `cmd/store.go` | 5-&#8288;7 |  |\n\n"+
-		"<details><summary><b>Why these files</b></summary>\n\n"+
+		"<details open><summary><b>Why these files</b></summary>\n\n"+
 		"| | File | Complexity | Used&nbsp;by | Test changed |\n")
 	assert.Contains(t, md, "| 4 | `cmd/store.go`<br><sub>84% similar to `pkg/core/store.go:Put()`</sub> | ⬜&#8288;⬜&#8288;⬜&#8288;⬜&#8288;⬜ | ⬜&#8288;⬜&#8288;⬜&#8288;⬜&#8288;⬜ | ✅ |\n")
 	assert.NotContains(t, md, "| 2 | `store_test.go` |", "tests carry no signal")
@@ -276,4 +276,15 @@ func TestDescribe(t *testing.T) {
 	assert.Contains(t, out, "1. `app/store.go`: the others use it\n2. `app/handler.go`\n")
 	assert.Contains(t, out, "Left out: 1 not analyzed")
 	assert.Equal(t, "Nothing changed.\n", report(&engine.Plan{}).Describe())
+}
+
+func TestWhyTheseFilesIsFoldedOnlyOnALongList(t *testing.T) {
+	p := readingPlan()
+	assert.Contains(t, p.Markdown(), "<details open><summary><b>Why these files</b></summary>", "three files with signals: shown")
+
+	p.Files = append(p.Files, engine.FileReport{Path: "cmd/list.go", Status: "M", Read: true, ToRead: 4, Hunks: []engine.HunkReport{{}},
+		Ranges: []engine.LineRange{{Start: 2, End: 5}}, Values: map[engine.Feature]float64{engine.FeatureMaxComplexity: 5}})
+	md := p.Markdown()
+	assert.Contains(t, md, "<details><summary><b>Why these files</b></summary>", "four files with signals: folded")
+	assert.NotContains(t, md, "<details open>")
 }

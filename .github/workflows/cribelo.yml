@@ -14,4 +14,3 @@ jobs:
       - uses: ./
         with:
           version: source
-          inline: true

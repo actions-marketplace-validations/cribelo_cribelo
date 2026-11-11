@@ -45,7 +45,8 @@ func Run(args []string, version string) int {
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "dir", Aliases: []string{"C"}, Value: ".", Usage: "repository or directory inside it"},
 			&cli.StringFlag{Name: "base", Usage: "reference to compare against (default: the default branch)"},
-			&cli.StringFlag{Name: "format", Value: "text", Usage: "text, markdown, json, or github-review: the lines to read closely as review comments, the body of a call to the GitHub reviews API"},
+			&cli.StringFlag{Name: "format", Value: "text", Usage: "text, markdown, json, github-review (the places to read closely as review comments, the body of a call to the GitHub reviews API) or github-annotations (the same places as notices for a GitHub Actions job log)"},
+			&cli.IntFlag{Name: "max-comments", Value: render.DefaultMaxComments, Usage: "places marked by github-review and github-annotations, the first ones in reading order"},
 			&cli.IntFlag{Name: "top", Value: 0, Usage: "read exactly this many files (default: every high file, at least 3)"},
 			&cli.DurationFlag{Name: "budget", Usage: "reading time available, e.g. 10m; overrides --top"},
 			&cli.StringFlag{Name: "fail-on", Usage: "fail when the change states one of these facts, comma separated: cycle, signature, history, dependency, library, clone, api, coverage"},
@@ -68,7 +69,7 @@ func Run(args []string, version string) int {
 				return err
 			}
 			report.Version = version
-			if err := printPlan(report, c.String("format")); err != nil {
+			if err := printPlan(report, c.String("format"), c.Int("max-comments")); err != nil {
 				return err
 			}
 			if report.Gate == "failed" {
@@ -294,7 +295,7 @@ func runBacktest(c *cli.Context) (*core.Backtest, error) {
 	})
 }
 
-func printPlan(plan render.Report, format string) error {
+func printPlan(plan render.Report, format string, maxComments int) error {
 	switch format {
 	case "", "text":
 		fmt.Print(plan.Text())
@@ -307,13 +308,15 @@ func printPlan(plan render.Report, format string) error {
 		}
 		fmt.Print(out)
 	case "github-review":
-		out, err := plan.Review().JSON()
+		out, err := plan.Review(maxComments).JSON()
 		if err != nil {
 			return err
 		}
 		fmt.Print(out)
+	case "github-annotations":
+		fmt.Print(plan.Annotations(maxComments))
 	default:
-		return fmt.Errorf("unknown format %q (text, markdown, json or github-review)", format)
+		return fmt.Errorf("unknown format %q (text, markdown, json, github-review or github-annotations)", format)
 	}
 	return nil
 }

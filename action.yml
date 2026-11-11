@@ -28,8 +28,11 @@ inputs:
     description: Post the plan as a pull request comment.
     default: "true"
   inline:
-    description: Also mark the lines to read closely with review comments on the diff, replaced at each run. Needs comment.
-    default: "false"
+    description: Also mark the places to read closely on the diff, each with what to check there and why, replaced at each run. Review comments when the token can write, notices of the job otherwise. Needs comment. Set to false to keep the diff bare.
+    default: "true"
+  inline-max:
+    description: Places marked on the diff at most, the first ones in reading order.
+    default: "10"
   token:
     description: Token used to post the comment. Needs pull-requests write.
     default: ${{ github.token }}
@@ -92,6 +95,7 @@ runs:
         FAIL_ON: ${{ inputs.fail-on }}
         FAIL_OVER: ${{ inputs.fail-over }}
         INLINE: ${{ inputs.inline }}
+        INLINE_MAX: ${{ inputs.inline-max }}
       run: |
         set +e -uo pipefail
         args=(--format markdown --no-color)
@@ -104,11 +108,23 @@ runs:
         echo "path=$out" >> "$GITHUB_OUTPUT"
         cribelo "${args[@]}" --format json > "$RUNNER_TEMP/cribelo/plan.json" 2>/dev/null
         if [ "$INLINE" = true ]; then
-          cribelo "${args[@]}" --format github-review > "$RUNNER_TEMP/cribelo/review.json" 2>/dev/null
-          if [ $? -le 1 ] && [ -s "$RUNNER_TEMP/cribelo/review.json" ]; then
-            echo "review=$RUNNER_TEMP/cribelo/review.json" >> "$GITHUB_OUTPUT"
+          # A version pinned before the flag or the format existed: 2.2.0
+          # writes the review without a limit, older ones write none.
+          [[ "$INLINE_MAX" =~ ^[0-9]+$ ]] || INLINE_MAX=10
+          review="$RUNNER_TEMP/cribelo/review.json"
+          cribelo "${args[@]}" --format github-review --max-comments "$INLINE_MAX" > "$review" 2>/dev/null
+          if [ $? -gt 1 ] || [ ! -s "$review" ]; then
+            cribelo "${args[@]}" --format github-review > "$review" 2>/dev/null
+          fi
+          if [ $? -le 1 ] && [ -s "$review" ]; then
+            echo "review=$review" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::cribelo: this version of cribelo does not write review comments (inline needs a release after 2.1.0); the plan is posted without them"
+            echo "::notice::cribelo: this version of cribelo does not mark the lines on the diff (it needs a release after 2.1.0); the plan is posted without them"
+          fi
+          notices="$RUNNER_TEMP/cribelo/notices.txt"
+          cribelo "${args[@]}" --format github-annotations --max-comments "$INLINE_MAX" > "$notices" 2>/dev/null
+          if [ $? -le 1 ] && [ -s "$notices" ]; then
+            echo "notices=$notices" >> "$GITHUB_OUTPUT"
           fi
         fi
         python3 - "$RUNNER_TEMP/cribelo/plan.json" >> "$GITHUB_OUTPUT" 2>/dev/null <<'PY' || printf 'highest=none\nminutes=0\ngate=none\nreasons=\n' >> "$GITHUB_OUTPUT"
@@ -155,6 +171,22 @@ runs:
         else
           echo "::warning::cribelo: could not comment on the pull request (does the workflow grant pull-requests: write?); $handoff"
           echo "posted=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    # Without the right to comment, and without a comment workflow to do it
+    # later, the places to read are written as notices of this job: GitHub
+    # shows them on the lines of the diff, and writing them takes no right.
+    - name: Mark the lines without the right to comment
+      if: steps.comment.outputs.posted == 'false' && steps.plan.outputs.notices != ''
+      shell: bash
+      env:
+        NOTICES: ${{ steps.plan.outputs.notices }}
+      run: |
+        set -euo pipefail
+        if grep -rqsE 'cribelo/cribelo/comment|uses: +\./comment' "$GITHUB_WORKSPACE/.github/workflows"; then
+          echo "the comment workflow of this repository posts the review comments"
+        else
+          cat "$NOTICES"
         fi
 
     - name: Prepare the plan for the comment workflow
