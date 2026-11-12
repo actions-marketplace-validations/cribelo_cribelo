@@ -40,7 +40,7 @@ func Run(args []string, version string) int {
 	app := &cli.App{
 		Name:      "cribelo",
 		Usage:     "the reading map of a change: what to read, in which order, and what the diff does not show",
-		UsageText: "cribelo [options]            plan for the working tree against the base branch\n   cribelo skip|explain|describe|backtest|calibrate",
+		UsageText: "cribelo [options]            plan for the working tree against the base branch\n   cribelo inbox|pr|skip|explain|describe|mcp|backtest|calibrate",
 		Version:   version,
 		Flags: []cli.Flag{
 			&cli.StringFlag{Name: "dir", Aliases: []string{"C"}, Value: ".", Usage: "repository or directory inside it"},
@@ -100,6 +100,42 @@ func Run(args []string, version string) int {
 					}
 					fmt.Print(plan.Describe())
 					return nil
+				},
+			},
+			{
+				Name:      "pr",
+				Usage:     "plan a pull request or a merge request by its number, without checking it out (needs gh, or glab on GitLab)",
+				ArgsUsage: "<number>",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{Name: "viewed", Usage: "mark as viewed, on GitHub and for you, the files a reviewer need not open: mechanical changes, renames, generated files"},
+					&cli.BoolFlag{Name: "dry-run", Usage: "with --viewed, list the files without marking them"},
+					&cli.StringFlag{Name: "forge", Usage: "github or gitlab, when the host of the remote does not say which"},
+				},
+				Action: runPull,
+			},
+			{
+				Name:  "inbox",
+				Usage: "list the pull requests or merge requests that wait for your review, with the time each takes to read (needs gh, or glab on GitLab)",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{Name: "all", Usage: "every open pull request, not only those that ask for your review"},
+					&cli.BoolFlag{Name: "drafts", Usage: "keep the drafts"},
+					&cli.IntFlag{Name: "limit", Value: 20, Usage: "pull requests read at most"},
+					&cli.StringFlag{Name: "forge", Usage: "github or gitlab, when the host of the remote does not say which"},
+				},
+				Action: runInbox,
+			},
+			{
+				Name:  "mcp",
+				Usage: "serve the plan and explain to a coding agent, over the Model Context Protocol on stdio",
+				Action: func(c *cli.Context) error {
+					// Colors would be escape codes in the text an agent reads.
+					render.SetColor(false)
+					return serveMCP(os.Stdin, os.Stdout, mcpServer{
+						version:     version,
+						dir:         c.String("dir"),
+						options:     planOptions(c, core.Options{}),
+						pullRequest: c.String("pull-request"),
+					})
 				},
 			},
 			{
@@ -223,11 +259,13 @@ func Run(args []string, version string) int {
 // runPlan builds the plan of the working tree and wraps it for the renderers,
 // with the links to the pull request when one is known.
 func runPlan(c *cli.Context) (render.Report, error) {
-	repo, err := core.OpenRepo(c.String("dir"))
-	if err != nil {
-		return render.Report{}, err
-	}
-	plan, err := core.Run(repo, core.Options{
+	return runPlanWith(c, core.Options{})
+}
+
+// planOptions reads the options of a plan from the global flags, laid over
+// the ones a command sets itself.
+func planOptions(c *cli.Context, extra core.Options) core.Options {
+	return core.Options{
 		Base:        c.String("base"),
 		Top:         c.Int("top"),
 		Exact:       c.IsSet("top"),
@@ -237,17 +275,33 @@ func runPlan(c *cli.Context) (render.Report, error) {
 		WeightsPath: c.String("weights"),
 		Clones:      !c.Bool("no-clones"),
 		Coverage:    c.String("coverage"),
-	})
+	}
+}
+
+// runPlanWith builds the plan with the global flags laid over the options
+// a command sets itself.
+func runPlanWith(c *cli.Context, extra core.Options) (render.Report, error) {
+	return buildReport(c.String("dir"), planOptions(c, extra), c.String("pull-request"))
+}
+
+// buildReport builds the plan of the repository at dir and wraps it for the
+// renderers. It takes no context, so that the MCP server builds its plans
+// the way the command line does.
+func buildReport(dir string, opts core.Options, pullRequest string) (render.Report, error) {
+	repo, err := core.OpenRepo(dir)
+	if err != nil {
+		return render.Report{}, err
+	}
+	plan, err := core.Run(repo, opts)
 	if err != nil {
 		return render.Report{}, err
 	}
 	report := render.Report{Plan: plan}
 	// An address given on the command line has to be one; what the CI says
 	// is used when it makes sense and left alone otherwise.
-	given := c.String("pull-request")
-	if address := pullRequestAddress(given, os.Getenv); address != "" {
+	if address := pullRequestAddress(pullRequest, os.Getenv); address != "" {
 		links, err := render.PullRequestLinks(address, plan.HeadSha)
-		if err != nil && given != "" {
+		if err != nil && pullRequest != "" {
 			return render.Report{}, err
 		}
 		report.Links = links

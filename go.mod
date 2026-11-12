@@ -3,7 +3,7 @@ module github.com/cribelo/cribelo
 go 1.25.0
 
 require (
-	github.com/ast-metrics/ast-metrics v0.43.2-0.20261110145448-f64d4c168ebb
+	github.com/ast-metrics/ast-metrics v0.43.2-0.20261112150812-3e84240f381e
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/muesli/termenv v0.15.2
