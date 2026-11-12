@@ -8,6 +8,10 @@
 # api scope, Reporter role) it is also posted as one note, updated on each push.
 # Options are variables: CRIBELO_BUDGET, CRIBELO_TOP, CRIBELO_FAIL_ON,
 # CRIBELO_FAIL_OVER, CRIBELO_VERSION. They mean what the GitHub Action inputs mean.
+#
+# On an instance whose runners do not reach github.com, copy this file into a
+# project of yours, include it with include:project, and set CRIBELO_DOWNLOAD_URL
+# to where you keep the binary (the generic package registry, for instance).
 
 cribelo:
   stage: test
@@ -25,7 +29,9 @@ cribelo:
       apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends ca-certificates curl git jq >/dev/null
 
       case "$(uname -m)" in x86_64) arch=x86_64 ;; aarch64|arm64) arch=arm64 ;; *) echo "unsupported arch"; exit 1 ;; esac
-      if [ "$CRIBELO_VERSION" = latest ]; then
+      if [ -n "${CRIBELO_DOWNLOAD_URL:-}" ]; then
+        url="$CRIBELO_DOWNLOAD_URL"
+      elif [ "$CRIBELO_VERSION" = latest ]; then
         url="https://github.com/cribelo/cribelo/releases/latest/download/cribelo_Linux_${arch}"
       else
         url="https://github.com/cribelo/cribelo/releases/download/v${CRIBELO_VERSION#v}/cribelo_Linux_${arch}"
