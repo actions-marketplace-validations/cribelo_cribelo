@@ -11,24 +11,11 @@
 
 # Cribelo
 
-Agents open pull requests faster than anyone can read them. Cribelo reads the change before you do and answers three questions: what is left to read once the mechanical part is set aside, what the diff does not show, and where to start.
+**Cribelo measures a pull request in minutes of reading, then tells you which minutes matter.**
 
-```sh
-brew install cribelo/tap/cribelo
-cribelo                      # on the branch you want reviewed
-```
+One pull request of ruff, "Split up types/class.rs", changes 10,595 lines. Git sees no renamed file, so the diff asks you to read all of them. 8,424 only moved. Cribelo pairs each function that left a file with the one that arrived in another, and hands you the lines that changed on the way.
 
-It runs on your machine, from the git checkout. There is no service, no account and no language model, and the same change gives the same plan everywhere. It reads Go, PHP, Python, Rust, TypeScript, Java and C#.
-
-Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/cribelo/cribelo/main/install.sh | sh`, or a binary for Linux, macOS and Windows from the [releases page](https://github.com/cribelo/cribelo/releases).
-
-## What is left to read
-
-One pull request of ruff, "Split up types/class.rs", changes 10,595 lines. 8,424 of them only moved, and git sees no renamed file. Cribelo pairs each function that left a file with the one that arrived in another, and gives you the lines that changed on the way.
-
-Renames, formatting, comments and imports are set aside the same way. What remains is split in two: **a function that gained no decision and stays simple is glanced at, the rest is read closely.** The rule was set on 130,998 functions touched in 28 open source repositories. Half of the lines changed inside functions fall on the glance side, in functions that were fixed later 2.2 times less often than the others. Less often is not never, so the plan lists those lines too. Glance is not skip.
-
-## What the diff does not show
+It also tells you what the diff cannot show:
 
 ```
 Worth knowing  true by construction, not predicted
@@ -37,7 +24,28 @@ Worth knowing  true by construction, not predicted
 
 The diff shows one copy. The other, which nobody opened, is the one that will miss the fix.
 
-Cribelo states a handful of facts of that kind: an import cycle the change closes, an exported function whose parameters changed and the files that call it, a module that depends on another for the first time, a function already fixed several times this year, changed lines no test runs. Each is read from the import graph, the history or a coverage report. None is a prediction.
+Try it on the branch you want reviewed:
+
+```sh
+brew install cribelo/tap/cribelo
+cribelo
+```
+
+It runs on your machine, from the git checkout. There is no service, no account and no language model, and the same change gives the same plan everywhere. It reads Go, PHP, Python, Rust, TypeScript, Java and C#.
+
+Without Homebrew: `curl -fsSL https://raw.githubusercontent.com/cribelo/cribelo/main/install.sh | sh`, or a binary for Linux, macOS and Windows from the [releases page](https://github.com/cribelo/cribelo/releases).
+
+## Check it on your own history
+
+Don't take the plan on trust. `cribelo backtest` replays the history of your repository: for each past change it rebuilds the plan from the code of that time, then looks at which files a fix touched in the ninety days that followed. You see how many of them the plan would have had you read, next to what reading the largest files first would have given. [How the backtest counts](docs/backtest.md).
+
+## What is left to read
+
+Moves, renames, formatting, comments and imports are set aside. What remains is split in two: **a function that gained no decision and stays simple is glanced at, the rest is read closely.** The rule was set on 130,998 functions touched in 28 open source repositories. Half of the lines changed inside functions fall on the glance side, in functions that were fixed later 2.2 times less often than the others. Less often is not never, so the plan lists those lines too. Glance is not skip.
+
+## What the diff does not show
+
+Beyond clones, Cribelo states a handful of facts: an import cycle the change closes, an exported function whose parameters changed and the files that call it, a module that depends on another for the first time, a function already fixed several times this year, changed lines no test runs. Each is read from the import graph, the history or a coverage report. None is a prediction.
 
 ## Where to start
 
@@ -103,8 +111,8 @@ One line in `.gitlab-ci.yml`, on gitlab.com or on your own instance. [The note o
 
 ## What it does not do
 
-Cribelo does not find your bugs. It tells you where your reading time goes, and it shows its work: [how it is computed](docs/how-it-is-computed.md) gives every rule and every weight, so that you can contest them, and [`cribelo backtest`](docs/backtest.md) replays the history of your repository to say which of the files fixed later the plan would have had you read.
+Cribelo does not find your bugs. It tells you where your reading time goes, and it shows its work: [how it is computed](docs/how-it-is-computed.md) gives every rule and every weight, so that you can contest them.
 
 [Every command](docs/commands.md) · [Configuration](docs/configuration.md) · [Working on Cribelo](docs/development.md)
 
-MIT license. The analysis is the `cribelo` package of [AST Metrics](https://github.com/ast-metrics/ast-metrics).
+Written by Jean-François Lépine, author of [PhpMetrics](https://github.com/phpmetrics/PhpMetrics) and [AST Metrics](https://github.com/ast-metrics/ast-metrics). MIT license. The analysis is the `cribelo` package of AST Metrics.
